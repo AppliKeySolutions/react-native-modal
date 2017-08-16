@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Dimensions, Modal, DeviceEventEmitter, TouchableWithoutFeedback } from 'react-native';
+import { Dimensions, Modal, TouchableHighlight, Platform } from 'react-native';
 import PropTypes from 'prop-types';
 import { View, initializeRegistryWithDefinitions } from 'react-native-animatable';
 import * as ANIMATION_DEFINITIONS from './animations';
@@ -24,9 +24,7 @@ export class ReactNativeModal extends Component {
     onModalShow: PropTypes.func,
     onModalHide: PropTypes.func,
     hideOnBack: PropTypes.bool,
-    hideOnBackdropPress: PropTypes.bool,
     onBackButtonPress: PropTypes.func,
-    onBackdropPress: PropTypes.func,
     style: PropTypes.any,
   };
 
@@ -43,8 +41,6 @@ export class ReactNativeModal extends Component {
     onModalHide: () => null,
     isVisible: false,
     hideOnBack: true,
-    hideOnBackdropPress: true,
-    onBackdropPress: () => null,
     onBackButtonPress: () => null,
   };
 
@@ -75,7 +71,6 @@ export class ReactNativeModal extends Component {
     if (this.state.isVisible) {
       this._open();
     }
-    DeviceEventEmitter.addListener('didUpdateDimensions', this._handleDimensionsUpdate);
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -88,15 +83,6 @@ export class ReactNativeModal extends Component {
     }
   }
 
-  _handleDimensionsUpdate = dimensionsUpdate => {
-    // Here we update the device dimensions in the state if the layout changed (triggering a render)
-    const deviceWidth = Dimensions.get('window').width;
-    const deviceHeight = Dimensions.get('window').height;
-    if (deviceWidth !== this.state.deviceWidth || deviceHeight !== this.state.deviceHeight) {
-      this.setState({ deviceWidth, deviceHeight });
-    }
-  };
-
   _open = () => {
     this.backdropRef.transitionTo(
       { opacity: this.props.backdropOpacity },
@@ -108,6 +94,9 @@ export class ReactNativeModal extends Component {
   };
 
   _close = async () => {
+    if (!this.state.isVisible) {
+      return;
+    }
     this.backdropRef.transitionTo({ opacity: 0 }, this.props.backdropTransitionOutTiming);
     this.contentRef[this.props.animationOut](this.props.animationOutTiming).then(() => {
       this.setState({ isVisible: false });
@@ -123,12 +112,14 @@ export class ReactNativeModal extends Component {
     this.props.onBackButtonPress();
   };
 
-  _closeOnBackdrop = () => {
-    if (this.props.hideOnBackdropPress) {
-      this._close()
+  _handleLayout = event => {
+    // Here we update the device dimensions in the state if the layout changed (triggering a render)
+    const deviceWidth = Dimensions.get('window').width;
+    const deviceHeight = Dimensions.get('window').height;
+    if (deviceWidth !== this.state.deviceWidth || deviceHeight !== this.state.deviceHeight) {
+      this.setState({ deviceWidth, deviceHeight });
     }
-    this.props.onBackdropPress()
-  }
+  };
 
   render() {
     const {
@@ -156,23 +147,29 @@ export class ReactNativeModal extends Component {
         onRequestClose={this._closeOnBack}
         {...otherProps}
       >
-        <TouchableWithoutFeedback onPress={this._closeOnBackdrop}>
-          <View
-            ref={ref => (this.backdropRef = ref)}
-            style={[
-              styles.backdrop,
-              {
-                backgroundColor: backdropColor,
-                width: deviceWidth,
-                height: deviceHeight,
-              },
-            ]}
-          />
-        </TouchableWithoutFeedback>
+
+        <View
+          onLayout={this._handleLayout}
+          ref={ref => (this.backdropRef = ref)}
+          style={[
+            styles.backdrop,
+            { backgroundColor: backdropColor, width: deviceWidth, height: deviceHeight },
+          ]}
+        >
+          <TouchableHighlight
+            onPress={() => {
+              return Platform.OS === 'ios' ?
+              this._close() : null;
+            }}
+            style={{width: deviceWidth, height: deviceHeight}}
+          >
+            <View/>
+          </TouchableHighlight>
+        </View>
+
         <View
           ref={ref => (this.contentRef = ref)}
           style={[{ margin: deviceWidth * 0.05 }, styles.content, style]}
-          pointerEvents="box-none"
           {...otherProps}
         >
           {children}
