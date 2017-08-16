@@ -11,7 +11,9 @@ export default StyleSheet.create({
     backgroundColor: 'black',
   },
   content: {
-    flex: 1,
+    position: 'absolute',
+    width: '90%',
+    bottom: 20,
     justifyContent: 'center',
   },
 });
